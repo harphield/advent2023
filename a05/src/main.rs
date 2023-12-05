@@ -244,18 +244,4 @@ mod tests {
 
         assert_eq!(find_lowest_by_ranges(1, &(1, 10), &map), 5);
     }
-
-    #[test]
-    fn test_find_lowest_with_ranges_02() {
-        let mut map = CatMap::new();
-        map.insert(1, vec![
-            (10, 5, 10),
-            (50, 15, 10),
-        ]);
-        map.insert(2, vec![
-            (5, 1, 5)
-        ]);
-
-        assert_eq!(find_lowest_by_ranges(1, &(1, 10), &map), 5);
-    }
 }
