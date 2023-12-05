@@ -42,21 +42,38 @@ fn main() -> Result<(), io::Error> {
         }
     }
 
-    // sort the maps
     let mut new_maps = CatMap::new();
     maps.iter().for_each(|(key, value)| {
-        let mut value = value.clone();
-        value.sort_by(|a, b| {
+        let mut map = value.clone();
+        // sort the maps
+        map.sort_by(|a, b| {
             a.1.cmp(&b.1)
         });
 
-        new_maps.insert(*key, value);
+        let mut new_map = vec![];
+
+        // filling gaps
+        for (i, rule) in map.iter().enumerate() {
+            new_map.push(*rule);
+            match map.get(i + 1) {
+                None => {}
+                Some(next_rule) => {
+                    if rule.1 + rule.2 != next_rule.1 {
+                        // got a gap
+                        // fill gap
+                        new_map.push((rule.1 + rule.2, rule.1 + rule.2, next_rule.1 - (rule.1 + rule.2)));
+                    }
+                }
+            }
+        }
+
+        new_maps.insert(*key, new_map);
     });
 
     maps = new_maps;
 
-    println!("{:?}", seeds);
-    println!("{:?}", maps);
+    // println!("{:?}", seeds);
+    // println!("{:?}", maps);
 
     let mut lowest: u64 = u64::MAX;
 
@@ -120,47 +137,62 @@ fn find_lowest_by_ranges(source_cat: u64, source_range: &(u64, u64), maps: &CatM
         return source_range.0;
     }
 
-    // split the range into smaller ranges that are either
-    // - mapped in one of the mappings = use the target value
-    // - not mapped = use the same value
+    let map = match maps.get(&source_cat) {
+        None => {
+            return source_range.0;
+        }
+        Some(m) => m
+    };
 
-    // range: 10-50 (10;40)
-    // map: 15-20 (15;5), 30-40 (30;10)
-    // splits: 10-14 (not mapped), 15-20 (mapped), 21-29 (not mapped), 30-40 (mapped), 41-50 (not mapped)
-
-    let mut index = source_range.0;
-    let mut remaining_length = source_range.1;
     let mut lowest = u64::MAX;
-    maps.get(&source_cat).unwrap().iter().for_each(|(mapping_dest_range_start, mapping_source_range_start, mapping_range_length)| {
 
-        if &index < mapping_source_range_start {
-            // what if my range starts before the mapped range starts?
+    let mut start = source_range.0;
+    let mut remaining = source_range.1;
 
-            let length = min(mapping_source_range_start - index, source_range.1);
-            // not mapped subrange
-            let subrange = (index, length);
-            lowest = min(lowest, find_lowest_by_ranges(source_cat + 1, &subrange, &maps));
+    if start < map[0].1 {
+        // new range before mappings
+        lowest = min(lowest, find_lowest_by_ranges(source_cat + 1, &(start, map[0].1 - start), &maps));
 
-            index += length;
-            remaining_length -= length;
-
-            // no need to do more
-            if remaining_length == 0 {
-                return;
-            }
+        if remaining < map[0].1 - start {
+            return lowest;
         }
 
-        // what if my range starts after the mapped range?
-        let subrange = (index, remaining_length);
-        lowest = min(lowest, find_lowest_by_ranges(source_cat + 1, &subrange, &maps));
+        remaining -= map[0].1 - start;
+        start = map[0].1;
+    }
+
+    map.iter().for_each(|rule| {
+        if remaining == 0 || (start > rule.1 && start >= rule.1 + rule.2) {
+            return;
+        }
+
+        if start < rule.1 {
+            panic!("start < rule.1 {} {}", start, rule.1);
+        }
+
+        if remaining > rule.2 {
+            // we need to continue after this
+            lowest = min(lowest, find_lowest_by_ranges(source_cat + 1, &(rule.0 + (start - rule.1), rule.2 - (start - rule.1)), &maps));
+
+            start += rule.2 - (start - rule.1);
+            remaining -= rule.2 - (start - rule.1);
+        } else {
+            // we end here
+            lowest = min(lowest, find_lowest_by_ranges(source_cat + 1, &(rule.0 + (start - rule.1), min(remaining, rule.2 - (start - rule.1))), &maps));
+            remaining = 0;
+        }
     });
+
+    if remaining > 0 {
+        lowest = min(lowest, find_lowest_by_ranges(source_cat + 1, &(start, remaining), &maps));
+    }
 
     lowest
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{cat_to_cat, cat_to_next, CatMap};
+    use crate::{cat_to_cat, cat_to_next, CatMap, find_lowest_by_ranges};
 
     #[test]
     fn test_cat_1_to_next() {
@@ -189,14 +221,41 @@ mod tests {
     }
 
     #[test]
-    fn test_find_lowest_with_ranges() {
+    fn test_find_lowest_with_ranges_01() {
         let mut map = CatMap::new();
         map.insert(1, vec![
-            (10, 1, 10)
+            (10, 1, 10),
+            (50, 11, 10),
         ]);
 
-        map.insert(2, vec![
-            (20, 10, 5),
+        assert_eq!(find_lowest_by_ranges(1, &(1, 10), &map), 10);
+    }
+
+    #[test]
+    fn test_find_lowest_with_ranges_02() {
+        let mut map = CatMap::new();
+        map.insert(1, vec![
+            (10, 5, 10),
+            (50, 15, 10),
         ]);
+        map.insert(2, vec![
+            (5, 1, 5)
+        ]);
+
+        assert_eq!(find_lowest_by_ranges(1, &(1, 10), &map), 5);
+    }
+
+    #[test]
+    fn test_find_lowest_with_ranges_02() {
+        let mut map = CatMap::new();
+        map.insert(1, vec![
+            (10, 5, 10),
+            (50, 15, 10),
+        ]);
+        map.insert(2, vec![
+            (5, 1, 5)
+        ]);
+
+        assert_eq!(find_lowest_by_ranges(1, &(1, 10), &map), 5);
     }
 }
