@@ -17,8 +17,8 @@ impl Card {
             None => {
                 match self.value {
                     'T' => 10,
-                    'J' => 11,
-                    // 'J' => 1,       // for part 2
+                    // 'J' => 11,
+                    'J' => 1, // for part 2
                     'Q' => 12,
                     'K' => 13,
                     'A' => 14,
@@ -49,17 +49,54 @@ struct Hand {
 
 impl Hand {
     fn to_int_value(&self) -> u32 {
-        // do we have Jokers?
-        if self.value.contains(&Card { value: 'J' }) {
-            // TODO transform it to the best card
-        }
-
-        let card_counts = self.value.iter().fold(HashMap::new(), |mut acc, c| {
+        let mut card_counts = self.value.iter().fold(HashMap::new(), |mut acc, c| {
             *acc.entry(c.value).or_insert(0) += 1;
             acc
         });
 
-        // let unique = self.value.iter().collect::<HashSet<_>>();
+        // are we doing part 2 and do we have Jokers?
+        let joker = Card { value: 'J' };
+        if joker.to_int_value() == 1 && self.value.contains(&joker) {
+            // replace jokers with the most frequest card (except J)
+            let mut mfc = 'J';
+            let mut most = 0;
+            for (c, cnt) in card_counts.iter() {
+                if c == &'J' {
+                    continue;
+                }
+
+                if cnt > &most {
+                    mfc = *c;
+                    most = *cnt;
+                } else if cnt == &most {
+                    // if there are 2 with the same frequency, use the most valuable card
+                    let most_card = Card { value: mfc };
+                    let card = Card { value: *c };
+
+                    if card.gt(&most_card) {
+                        mfc = *c;
+                    }
+                }
+            }
+
+            // if joker is the only card (JJJJJ), do nothing
+            if mfc != 'J' {
+                let mut new_hand_value = self.value.iter().map(|c| c.value).collect::<String>();
+                new_hand_value = new_hand_value.replace('J', mfc.to_string().as_str());
+                let new_hand = Hand {
+                    value: new_hand_value
+                        .chars()
+                        .map(|c| Card { value: c })
+                        .collect::<Vec<Card>>(),
+                };
+
+                card_counts = new_hand.value.iter().fold(HashMap::new(), |mut acc, c| {
+                    *acc.entry(c.value).or_insert(0) += 1;
+                    acc
+                });
+            }
+        }
+
         let unique_cnt = card_counts.len();
 
         // XXXXX
@@ -155,18 +192,14 @@ fn main() -> Result<(), io::Error> {
         }
     }
 
-    // println!("{:?}", cards);
-
     cards.sort_by(|a, b| a.0.cmp(&b.0));
-
-    // println!("{:#?}", cards);
 
     let mut sum = 0;
     for (i, (_c, bid)) in cards.iter().enumerate() {
         sum += (i as u32 + 1) * bid;
     }
 
-    println!("Part 1 result: {}", sum);
+    println!("Result: {}", sum);
 
     Ok(())
 }
