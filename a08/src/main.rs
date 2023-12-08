@@ -42,7 +42,10 @@ fn main() -> Result<(), io::Error> {
             dir_index = 0;
         }
 
-        let cn = nodes.get(&current_node).unwrap();
+        let cn = match nodes.get(&current_node) {
+            None => panic!("why? {}", current_node),
+            Some(v) => v,
+        };
         current_node = match directions[dir_index] {
             'L' => cn.0.to_string(),
             'R' => cn.1.to_string(),
@@ -56,38 +59,20 @@ fn main() -> Result<(), io::Error> {
     println!("Part 1 result: {}", steps);
 
     // Part 2
-    let mut current_nodes = find_ending_with_a(&nodes);
+    let current_nodes = find_ending_with_a(&nodes);
 
     println!("{:?}", current_nodes);
 
-    dir_index = 0;
-    steps = 0;
+    let mut z_steps = current_nodes.iter().map(|_v| 0).collect::<Vec<u64>>();
 
-    while !do_all_end_in_z(&current_nodes) {
-        if dir_index >= directions_length {
-            dir_index = 0;
-        }
-
-        let mut new_current_nodes = current_nodes.clone();
-
-        for (i, current_node) in current_nodes.iter().enumerate() {
-            let cn = nodes.get(current_node).unwrap();
-            new_current_nodes[i] = match directions[dir_index] {
-                'L' => cn.0.to_string(),
-                'R' => cn.1.to_string(),
-                _ => panic!("wrong dir"),
-            };
-        }
-
-        current_nodes = new_current_nodes;
-
-        // println!("{:?}", current_nodes);
-
-        steps += 1;
-        dir_index += 1;
+    for i in 0..current_nodes.len() {
+        z_steps[i] += steps_to_closest_z_from_node(&nodes, &directions, &current_nodes[i], 0);
     }
 
-    println!("Part 2 result: {}", steps);
+    println!(
+        "Part 2 result: {:?} and do Least Common Multiple of these, lol",
+        z_steps
+    );
 
     Ok(())
 }
@@ -104,8 +89,33 @@ fn find_ending_with_a(nodes: &Nodes) -> Vec<String> {
     result
 }
 
-fn do_all_end_in_z(nodes: &[String]) -> bool {
-    nodes.iter().all(|v| {
-        v.ends_with('Z')
-    })
+fn steps_to_closest_z_from_node(
+    nodes: &Nodes,
+    directions: &[char],
+    node: &str,
+    starting_direction: usize,
+) -> u64 {
+    let directions_length = directions.len();
+    let mut cn = node.to_string();
+    let mut dir_index = starting_direction;
+    let mut steps = 0;
+
+    // first step must always go
+    while steps == 0 || !cn.ends_with('Z') {
+        if dir_index >= directions_length {
+            dir_index = 0;
+        }
+
+        let cnd = nodes.get(&cn).unwrap();
+        cn = match directions[dir_index] {
+            'L' => cnd.0.to_string(),
+            'R' => cnd.1.to_string(),
+            _ => panic!("wrong dir"),
+        };
+
+        dir_index += 1;
+        steps += 1;
+    }
+
+    steps
 }
