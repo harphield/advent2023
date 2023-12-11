@@ -35,6 +35,35 @@ fn main() -> Result<(), io::Error> {
 
     println!("Part 1 result: {}", (pipeloop.len() as f32 / 2f32).ceil());
 
+    // PART 2
+    // https://alienryderflex.com/polygon/
+    let mut inside = 0;
+    for (i, _c) in grid.iter().enumerate() {
+        if !pipeloop.contains(&i) {
+            // test against the loop
+            let x = i % width;
+            let y = i / width;
+
+            let mut before = 0;
+            let mut after = 0;
+            pipeloop.iter().for_each(|l_i| {
+                if *l_i / width == y && !['L', 'J', '-'].contains(&grid[*l_i]) {
+                    if *l_i % width < x {
+                        before += 1;
+                    } else {
+                        after += 1;
+                    }
+                }
+            });
+
+            if before > 0 && after > 0 && before % 2 != 0 && after % 2 != 0 {
+                inside += 1;
+            }
+        }
+    }
+
+    println!("Part 2 result: {}", inside);
+
     Ok(())
 }
 
