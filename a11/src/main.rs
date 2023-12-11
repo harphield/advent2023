@@ -18,7 +18,7 @@ fn main() -> Result<(), io::Error> {
                 let mut row = line.chars().collect::<Vec<char>>();
                 space.append(&mut row);
             }
-            Err(_) => break
+            Err(_) => break,
         }
     }
 
@@ -26,9 +26,12 @@ fn main() -> Result<(), io::Error> {
     let mut new_space = space.clone();
 
     for i in (0..(new_space.len() / width)).rev() {
-        if new_space.iter().enumerate().filter(|(n, _v)| {
-            n / width == i
-        }).all(|(_n, v)| *v == '.') {
+        if new_space
+            .iter()
+            .enumerate()
+            .filter(|(n, _v)| n / width == i)
+            .all(|(_n, v)| *v == '.')
+        {
             for _x in 0..width {
                 new_space.insert(i * width, '.');
             }
@@ -42,9 +45,12 @@ fn main() -> Result<(), io::Error> {
 
     let mut new_width = width;
     for i in (0..new_width).rev() {
-        if new_space.iter().enumerate().filter(|(n, _v)| {
-            n % new_width == i
-        }).all(|(_n, v)| *v == '.') {
+        if new_space
+            .iter()
+            .enumerate()
+            .filter(|(n, _v)| n % new_width == i)
+            .all(|(_n, v)| *v == '.')
+        {
             for row in (0..new_space.len() / new_width).rev() {
                 new_space.insert(i + (row * new_width), '.');
             }
@@ -59,7 +65,12 @@ fn main() -> Result<(), io::Error> {
     draw_space(&space, &width);
 
     // find galaxies
-    let galaxies = space.iter().enumerate().filter(|(_n, v)| *v == &'#').map(|(n, _v)| n ).collect::<Vec<usize>>();
+    let galaxies = space
+        .iter()
+        .enumerate()
+        .filter(|(_n, v)| *v == &'#')
+        .map(|(n, _v)| n)
+        .collect::<Vec<usize>>();
 
     // Part 1: manattan distance
     let mut sum = 0;
