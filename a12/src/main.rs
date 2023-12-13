@@ -8,6 +8,7 @@ fn main() -> Result<(), io::Error> {
     let file = File::open("input.txt")?;
 
     let mut sum = 0;
+    let mut sum2 = 0;
     for line_r in io::BufReader::new(file).lines() {
         match line_r {
             Ok(line) => {
@@ -19,15 +20,34 @@ fn main() -> Result<(), io::Error> {
                     .map(|s| s.parse::<u32>().unwrap())
                     .collect::<Vec<u32>>();
 
-                let result =
-                    decode_to_string(&bad_counts, split[0].len(), Some(split[0].to_string()));
-                sum += result.len();
+                sum += decode_to_string(&bad_counts, split[0].len(), Some(split[0].to_string()));
+
+                // Part 2: unfolding
+                let mut unfolded = split[0].to_string().add("?");
+                let mut unfolded_counts = bad_counts.clone();
+                for i in 0..4 {
+                    unfolded = unfolded.add(split[0]);
+                    if i != 3 {
+                        unfolded = unfolded.add("?");
+                    }
+
+                    let mut bcc = bad_counts.clone();
+                    unfolded_counts.append(&mut bcc);
+                }
+
+                println!("{:?}", unfolded);
+                println!("{:?}", unfolded_counts);
+                println!();
+                // let result =
+                //     decode_to_string(&unfolded_counts, unfolded.len(), Some(unfolded.to_string()));
+                // sum2 += result.len();
             }
             Err(_) => break,
         }
     }
 
     println!("Part 1 result: {}", sum);
+    println!("Part 2 result: {}", sum2);
 
     Ok(())
 }
@@ -70,9 +90,9 @@ fn encode_to_broken_counts(line: &str) -> Option<Vec<u32>> {
     Some(result)
 }
 
-fn decode_to_string(blocks: &[u32], length: usize, pattern: Option<String>) -> Vec<String> {
+fn decode_to_string(blocks: &[u32], length: usize, pattern: Option<String>) -> u32 {
     let regex_pattern = match pattern {
-        None => "".to_string(),
+        None => ".*".to_string(),
         Some(ref p) => {
             let re_q = Regex::new("[?]+").unwrap();
             let mut questionmarks: Vec<String> =
@@ -106,7 +126,7 @@ fn decode_to_string(blocks: &[u32], length: usize, pattern: Option<String>) -> V
 
     if shortest.len() == length {
         // this is the only possibility
-        return vec![shortest];
+        return 1;
     }
 
     // try to add dots to fill length
@@ -124,11 +144,14 @@ fn decode_to_string(blocks: &[u32], length: usize, pattern: Option<String>) -> V
     // 3 before, 0 between block 1 and 2, 0 between blocks 2 and 3, 1 after
     // ...
 
-    let combinations = fill_holes(missing, holes_count);
-    combinations
-        .iter()
-        .map(|c| {
-            let s: Vec<String> = c
+    let mut number = 0;
+    for amount in 0..=missing {
+        let mut next = fill_holes(missing - amount, holes_count - 1);
+        next.iter_mut().for_each(|n| {
+            let mut add = vec![amount];
+            add.append(n);
+
+            let s: Vec<String> = add
                 .iter()
                 .enumerate()
                 .map(|(hole_index, fill_size)| {
@@ -146,23 +169,18 @@ fn decode_to_string(blocks: &[u32], length: usize, pattern: Option<String>) -> V
                     }
                 })
                 .collect();
+            let s = s.join("");
 
-            s.join("")
-        })
-        .filter(|s| match &pattern {
-            None => true,
-            Some(_p) => {
-                if re_p.is_match(s) {
-                    match encode_to_broken_counts(s) {
-                        None => false,
-                        Some(bc) => bc.eq(blocks),
-                    }
-                } else {
-                    false
-                }
+            if re_p.is_match(&s) && match encode_to_broken_counts(&s) {
+                None => false,
+                Some(bc) => bc.eq(blocks),
+            } {
+                number += 1;
             }
-        })
-        .collect()
+        });
+    }
+
+    number
 }
 
 fn fill_holes(missing: usize, hole_count: usize) -> Vec<Vec<usize>> {
@@ -201,20 +219,33 @@ mod tests {
 
         println!("{:#?}", result);
 
-        assert!(result.len() > 0);
+        assert!(result > 0);
     }
 
     #[test]
-    fn test_decode_with_pattern() {
+    fn test_decode_with_pattern_monster() {
         let result = decode_to_string(
-            &vec![1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3],
-            39,
-            Some("???.###????.###????.###????.###????.###".to_string()),
+            &vec![3, 2, 1, 3, 2, 1, 3, 2, 1, 3, 2, 1, 3, 2, 1],
+            "?###??????????###??????????###??????????###??????????###????????".len(),
+            Some("?###??????????###??????????###??????????###??????????###????????".to_string()),
         );
 
         println!("{:#?}", result);
 
-        assert_eq!(result.len(), 1);
+        assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn test_decode_with_pattern_smaller() {
+        let result = decode_to_string(
+            &vec![4, 1, 1, 4, 1, 1, 4, 1, 1, 4, 1, 1, 4, 1, 1],
+            "????.#...#...?????.#...#...?????.#...#...?????.#...#...?????.#...#...".len(),
+            Some("????.#...#...?????.#...#...?????.#...#...?????.#...#...?????.#...#...".to_string()),
+        );
+
+        println!("{:#?}", result);
+
+        assert_eq!(result, 1);
     }
 
     #[test]
