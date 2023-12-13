@@ -1,3 +1,4 @@
+use std::cmp::max;
 use regex::Regex;
 use std::fs::File;
 use std::io;
@@ -20,28 +21,26 @@ fn main() -> Result<(), io::Error> {
                     .map(|s| s.parse::<u32>().unwrap())
                     .collect::<Vec<u32>>();
 
-                sum +=
-                    count_matching_combinations(&bad_counts, split[0].len(), &split[0].to_string());
+                let first = count_matching_combinations(&bad_counts, split[0].len(), &split[0].to_string());
+                sum += first;
 
                 // Part 2: unfolding
-                let mut unfolded = split[0].to_string().add("?");
-                let mut unfolded_counts = bad_counts.clone();
-                for i in 0..4 {
-                    unfolded = unfolded.add(split[0]);
-                    if i != 3 {
-                        unfolded = unfolded.add("?");
-                    }
+                // how to choose, if we add the "?" in front or in the back?
 
-                    let mut bcc = bad_counts.clone();
-                    unfolded_counts.append(&mut bcc);
-                }
+                let simplified = split[0].to_string();
 
-                // println!("{:?}", unfolded);
-                // println!("{:?}", unfolded_counts);
-                // println!();
-                // let result =
-                //     decode_to_string(&unfolded_counts, unfolded.len(), Some(unfolded.to_string()));
-                // sum2 += result.len();
+                let mut unfolded_front = "?".to_string().add(&simplified);
+                let mut unfolded_back = &simplified.add("?");
+
+                let others_front =
+                    count_matching_combinations(&bad_counts, unfolded_front.len(), &unfolded_front.to_string());
+                let others_back =
+                    count_matching_combinations(&bad_counts, unfolded_back.len(), &unfolded_back.to_string());
+
+                let result = first * others_back.pow(4);
+                println!("{} = {}", split[0], result);
+
+                sum2 += result;
             }
             Err(_) => break,
         }
@@ -141,7 +140,7 @@ fn count_matching_combinations(blocks: &[u32], length: usize, pattern: &String) 
     // ...
 
     let mut current = vec![];
-    fill_and_count(missing, holes_count, &mut current, blocks, &re_p)
+    fill_and_count(missing, holes_count, &mut current, blocks, &re_p, pattern)
 }
 
 fn fill_and_count(
@@ -149,7 +148,8 @@ fn fill_and_count(
     hole_count: usize,
     current: &mut Vec<usize>,
     blocks: &[u32],
-    pattern: &Regex,
+    pattern_regex: &Regex,
+    pattern: &String
 ) -> u32 {
     if hole_count == 1 {
         current.push(missing);
@@ -177,7 +177,7 @@ fn fill_and_count(
 
         current.pop();
 
-        if pattern.is_match(&s)
+        if pattern_regex.is_match(&s)
             && match encode_to_broken_counts(&s) {
                 None => false,
                 Some(bc) => bc.eq(blocks),
@@ -192,18 +192,45 @@ fn fill_and_count(
     let mut result = 0;
 
     for amount in 0..=missing {
-        current.push(amount);
-        result += fill_and_count(missing - amount, hole_count - 1, current, blocks, pattern);
-        current.pop();
+        if !prune(pattern, blocks, hole_count, amount) {
+            current.push(amount);
+            result += fill_and_count(missing - amount, hole_count - 1, current, blocks, pattern_regex, pattern);
+            current.pop();
+        }
     }
 
     result
 }
 
+fn prune(pattern: &String, blocks: &[u32], hole_index: usize, amount: usize) -> bool {
+    // if we would add {amount} dots in {hole_index}, would it have problems with the pattern?
+    if hole_index == 0 {
+        // in front of block 0
+        let block_0_offset = 0;
+        let block_0_length = blocks[0] as usize;
+        for i in 0..=amount + block_0_length {
+            // added {amount} dots before and at least 1 dot will be after
+            if i < amount || i == amount + block_0_length {
+                // looking for a .
+                let c = &pattern[block_0_offset + i..block_0_offset + i + 1];
+                if c != "." && c != "?" {
+                    return true;
+                }
+            } else {
+                // looking for a #
+                let c = &pattern[block_0_offset + i..block_0_offset + i + 1];
+                if c != "#" && c != "?" {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{count_matching_combinations, encode_to_broken_counts};
-    use regex::Regex;
+    use crate::{count_matching_combinations, encode_to_broken_counts, prune};
 
     #[test]
     fn test_encode() {
@@ -215,12 +242,31 @@ mod tests {
     #[test]
     fn test_counting_results() {
         let result = count_matching_combinations(
-            &vec![3, 2, 1],
-            "?###????????".len(),
-            &"?###????????".to_string(),
+            &vec![4, 1, 1],
+            "?????.#...#...".len(),
+            &"?????.#...#...".to_string(),
         );
 
-        assert_eq!(result, 10);
+        assert_eq!(result, 2);
+    }
+
+    #[test]
+    fn test_counting_results_2() {
+        let result = count_matching_combinations(
+            &vec![1, 1, 3],
+            ".??..??...?##.".len(),
+            &".??..??...?##.".to_string(),
+        );
+
+        assert_eq!(result, 4);
+
+        let result = count_matching_combinations(
+            &vec![1, 1, 3],
+            "?.??..??...?##.".len(),
+            &"?.??..??...?##.".to_string(),
+        );
+
+        assert_eq!(result, 8);
     }
 
     #[test]
@@ -231,6 +277,14 @@ mod tests {
             &"????.#...#...?????.#...#...?????.#...#...?????.#...#...?????.#...#...".to_string(),
         );
 
-        assert_eq!(result, 10);
+        // 1 * 2 * 2 * 2 * 2
+        assert_eq!(result, 16);
+    }
+
+    #[test]
+    fn test_prune() {
+        assert!(prune(&"?###????????".to_string(), &vec![3, 2, 1], 0, 0));
+        assert!(!prune(&"?###????????".to_string(), &vec![3, 2, 1], 0, 1));
+        assert!(prune(&"?###????????".to_string(), &vec![3, 2, 1], 0, 2));
     }
 }
