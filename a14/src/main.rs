@@ -1,4 +1,7 @@
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::fs::File;
+use std::hash::{Hash, Hasher};
 use std::io;
 use std::io::BufRead;
 
@@ -46,28 +49,35 @@ fn main() -> Result<(), io::Error> {
 
     // Part 2
     grid = original_grid;
+    let mut map: HashMap<u64, (u64, u32)> = HashMap::new();
 
     let mut sum = 0;
+    let mut steps = vec![];
     for n in 0..1_000_000_000 {
-        // one spin
-        for i in 0..4 {
-            tilt_w_orientation(
-                &mut grid,
-                width,
-                rows_count,
-                match i {
-                    0 => Orientation::North,
-                    1 => Orientation::West,
-                    2 => Orientation::South,
-                    3 => Orientation::East,
-                    _ => panic!("aaaa"),
-                },
-            );
+        let mut hasher = DefaultHasher::new();
+        grid.hash(&mut hasher);
+        let grid_hash = hasher.finish();
 
-            // print_grid(&grid, width);
-            // println!();
+        match map.get(&grid_hash) {
+            None => {
+                for i in 0..4 {
+                    tilt_w_orientation(
+                        &mut grid,
+                        width,
+                        rows_count,
+                        match i {
+                            0 => Orientation::North,
+                            1 => Orientation::West,
+                            2 => Orientation::South,
+                            3 => Orientation::East,
+                            _ => panic!("aaaa"),
+                        },
+                    );
 
-            if i == 3 {
+                    // print_grid(&grid, width);
+                    // println!();
+                }
+
                 sum = grid
                     .iter()
                     .enumerate()
@@ -79,12 +89,50 @@ fn main() -> Result<(), io::Error> {
                         (rows_count - (n / width)) as u32
                     })
                     .sum();
+
+                let mut hasher = DefaultHasher::new();
+                grid.hash(&mut hasher);
+                let grid_hash_after = hasher.finish();
+
+                map.insert(grid_hash, (grid_hash_after, sum));
+
+                println!("Saving at {} : {} {} {}", n, grid_hash, grid_hash_after, sum);
+                steps.push((grid_hash, grid_hash_after, sum));
+            }
+            Some((gh, s)) => {
+                // found a loop
+                println!("Loop at {} : {} {} {}", n, grid_hash, gh, sum);
+                println!("{:?}", steps);
+
+                let mut before_loop_start = 0;
+                let mut loop_length = 0;
+                let mut loop_started = false;
+                for i in 0..steps.len() {
+                    if loop_started && steps[i].0 != grid_hash {
+                        loop_length += 1;
+                    } else if steps[i].0 != grid_hash {
+                        before_loop_start += 1;
+                    } else {
+                        loop_started = true;
+                        loop_length += 1;
+                    }
+                }
+
+                println!("before loop: {}, loop length: {}", before_loop_start, loop_length);
+
+                let loop_step_at_1b = before_loop_start + ((1_000_000_000f32 - before_loop_start as f32) % loop_length as f32) as usize;
+
+                println!("{:?}", steps[loop_step_at_1b]);
+
+                sum = *s;
+                break;
             }
         }
 
-        if n % 100_000 == 0 {
-            println!("I'm at {} : {}", n, sum);
-        }
+        // println!("I'm at {} : {}", n, sum);
+        // if n % 100_000 == 0 {
+        //     println!("I'm at {} : {}", n, sum);
+        // }
     }
 
     println!("Part 2 result: {}", sum);
