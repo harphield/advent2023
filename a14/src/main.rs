@@ -53,7 +53,7 @@ fn main() -> Result<(), io::Error> {
 
     let mut sum = 0;
     let mut steps = vec![];
-    for n in 0..1_000_000_000 {
+    for _n in 0..1_000_000_000 {
         let mut hasher = DefaultHasher::new();
         grid.hash(&mut hasher);
         let grid_hash = hasher.finish();
@@ -73,9 +73,6 @@ fn main() -> Result<(), io::Error> {
                             _ => panic!("aaaa"),
                         },
                     );
-
-                    // print_grid(&grid, width);
-                    // println!();
                 }
 
                 sum = grid
@@ -96,21 +93,17 @@ fn main() -> Result<(), io::Error> {
 
                 map.insert(grid_hash, (grid_hash_after, sum));
 
-                println!("Saving at {} : {} {} {}", n, grid_hash, grid_hash_after, sum);
                 steps.push((grid_hash, grid_hash_after, sum));
             }
-            Some((gh, s)) => {
+            Some((_gh, _s)) => {
                 // found a loop
-                println!("Loop at {} : {} {} {}", n, grid_hash, gh, sum);
-                println!("{:?}", steps);
-
                 let mut before_loop_start = 0;
                 let mut loop_length = 0;
                 let mut loop_started = false;
-                for i in 0..steps.len() {
-                    if loop_started && steps[i].0 != grid_hash {
+                for step in steps.iter() {
+                    if loop_started && step.0 != grid_hash {
                         loop_length += 1;
-                    } else if steps[i].0 != grid_hash {
+                    } else if step.0 != grid_hash {
                         before_loop_start += 1;
                     } else {
                         loop_started = true;
@@ -118,21 +111,12 @@ fn main() -> Result<(), io::Error> {
                     }
                 }
 
-                println!("before loop: {}, loop length: {}", before_loop_start, loop_length);
+                let loop_shift = (1_000_000_000 - before_loop_start) % loop_length;
 
-                let loop_step_at_1b = before_loop_start + ((1_000_000_000f32 - before_loop_start as f32) % loop_length as f32) as usize;
-
-                println!("{:?}", steps[loop_step_at_1b]);
-
-                sum = *s;
+                sum = steps[before_loop_start + loop_shift - 1].2;
                 break;
             }
         }
-
-        // println!("I'm at {} : {}", n, sum);
-        // if n % 100_000 == 0 {
-        //     println!("I'm at {} : {}", n, sum);
-        // }
     }
 
     println!("Part 2 result: {}", sum);
