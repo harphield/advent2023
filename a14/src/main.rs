@@ -23,8 +23,10 @@ fn main() -> Result<(), io::Error> {
         }
     }
 
-    let mut rows_count = grid.len() / width;
-    tilt(&mut grid, width);
+    let original_grid = grid.clone();
+
+    let rows_count = grid.len() / width;
+    tilt_w_orientation(&mut grid, width, rows_count, Orientation::North);
 
     let sum: u32 = grid
         .iter()
@@ -43,11 +45,28 @@ fn main() -> Result<(), io::Error> {
     println!("Part 1 result: {}", sum);
 
     // Part 2
+    grid = original_grid;
+
     let mut sum = 0;
     for n in 0..1_000_000_000 {
         // one spin
         for i in 0..4 {
-            tilt(&mut grid, width);
+            tilt_w_orientation(
+                &mut grid,
+                width,
+                rows_count,
+                match i {
+                    0 => Orientation::North,
+                    1 => Orientation::West,
+                    2 => Orientation::South,
+                    3 => Orientation::East,
+                    _ => panic!("aaaa"),
+                },
+            );
+
+            // print_grid(&grid, width);
+            // println!();
+
             if i == 3 {
                 sum = grid
                     .iter()
@@ -61,14 +80,8 @@ fn main() -> Result<(), io::Error> {
                     })
                     .sum();
             }
-
-            grid = rotate_grid(&mut grid, width);
-            width = rows_count;
-            rows_count = grid.len() / width;
         }
 
-        // print_grid(&grid, width);
-        // println!();
         if n % 100_000 == 0 {
             println!("I'm at {} : {}", n, sum);
         }
@@ -79,85 +92,99 @@ fn main() -> Result<(), io::Error> {
     Ok(())
 }
 
-fn tilt(
-    grid: &mut [char],
-    width: usize
-) {
-    let rock_positions: Vec<usize> = grid
+fn tilt_w_orientation(grid: &mut [char], width: usize, row_count: usize, orientation: Orientation) {
+    let mut rock_positions: Vec<usize> = grid
         .iter()
         .enumerate()
         .filter(|(_n, c)| *c == &'O')
         .map(|(n, _c)| n)
         .collect();
 
+    rock_positions.sort_by_cached_key(|n| {
+        let coords = get_coords_from_index_and_orientation(*n, width, row_count, &orientation);
+        (coords.1, coords.0)
+    });
+
     for rp in rock_positions.iter() {
-        let x = rp % width;
-        let y = rp / width;
+        // let x = rp % width;
+        // let y = rp / width;
+        //
+        let new_coords = get_coords_from_index_and_orientation(*rp, width, row_count, &orientation);
+        let x = new_coords.0;
+        let y = new_coords.1;
 
         if y == 0 {
         } else {
             // going up
             let mut fall_to_y = y - 1;
             loop {
-                if grid[fall_to_y * width + x] == '.' {
+                if grid[get_index_by_coords_and_orientation(
+                    x,
+                    fall_to_y,
+                    width,
+                    row_count,
+                    &orientation,
+                )] == '.'
+                {
                     if fall_to_y > 0 {
                         fall_to_y -= 1;
                     } else {
                         // stop falling
-                        if grid[fall_to_y * width + x] != grid[y * width + x] {
-                            grid[fall_to_y * width + x] = 'O';
-                            grid[y * width + x] = '.';
+                        if grid[get_index_by_coords_and_orientation(
+                            x,
+                            fall_to_y,
+                            width,
+                            row_count,
+                            &orientation,
+                        )] != grid[get_index_by_coords_and_orientation(
+                            x,
+                            y,
+                            width,
+                            row_count,
+                            &orientation,
+                        )] {
+                            grid[get_index_by_coords_and_orientation(
+                                x,
+                                fall_to_y,
+                                width,
+                                row_count,
+                                &orientation,
+                            )] = 'O';
+                            grid[get_index_by_coords_and_orientation(
+                                x,
+                                y,
+                                width,
+                                row_count,
+                                &orientation,
+                            )] = '.';
                         }
                         break;
                     }
                 } else {
                     // stop falling
-                    if grid[(fall_to_y + 1) * width + x] != grid[y * width + x] {
-                        grid[(fall_to_y + 1) * width + x] = 'O';
-                        grid[y * width + x] = '.';
-                    }
-                    break;
-                }
-            }
-        }
-    }
-}
-
-fn tilt_w_orientation(
-    grid: &mut [char],
-    width: usize,
-    row_count: usize,
-    orientation: Orientation
-) {
-    for i in 0..grid.len() {
-        if grid[i] != 'O' {
-            continue;
-        }
-
-        let x = i % width;
-        let y = i / width;
-
-        if y == 0 {
-        } else {
-            // going up
-            let mut fall_to_y = y - 1;
-            loop {
-                if grid[get_index_by_coords_and_orientation(x, fall_to_y, width, row_count, &orientation)] == '.' {
-                    if fall_to_y > 0 {
-                        fall_to_y -= 1;
-                    } else {
-                        // stop falling
-                        if grid[get_index_by_coords_and_orientation(x, fall_to_y, width, row_count, &orientation)] != grid[y * width + x] {
-                            grid[get_index_by_coords_and_orientation(x, fall_to_y, width, row_count, &orientation)] = 'O';
-                            grid[get_index_by_coords_and_orientation(x, y, width, row_count, &orientation)] = '.';
-                        }
-                        break;
-                    }
-                } else {
-                    // stop falling
-                    if grid[get_index_by_coords_and_orientation(x, fall_to_y + 1, width, row_count, &orientation)] != grid[y * width + x] {
-                        grid[get_index_by_coords_and_orientation(x, fall_to_y + 1, width, row_count, &orientation)] = 'O';
-                        grid[get_index_by_coords_and_orientation(x, y, width, row_count, &orientation)] = '.';
+                    if grid[get_index_by_coords_and_orientation(
+                        x,
+                        fall_to_y + 1,
+                        width,
+                        row_count,
+                        &orientation,
+                    )] != grid
+                        [get_index_by_coords_and_orientation(x, y, width, row_count, &orientation)]
+                    {
+                        grid[get_index_by_coords_and_orientation(
+                            x,
+                            fall_to_y + 1,
+                            width,
+                            row_count,
+                            &orientation,
+                        )] = 'O';
+                        grid[get_index_by_coords_and_orientation(
+                            x,
+                            y,
+                            width,
+                            row_count,
+                            &orientation,
+                        )] = '.';
                     }
                     break;
                 }
@@ -173,11 +200,15 @@ enum Orientation {
     East,
 }
 
-fn get_index_by_coords_and_orientation(x: usize, y: usize, width: usize, row_count: usize, orientation: &Orientation) -> usize {
+fn get_index_by_coords_and_orientation(
+    x: usize,
+    y: usize,
+    width: usize,
+    row_count: usize,
+    orientation: &Orientation,
+) -> usize {
     match orientation {
-        Orientation::North => {
-            y * width + x
-        }
+        Orientation::North => y * width + x,
         Orientation::West => {
             // [0,0] = [0,9] in a 10x10 grid
             // [1,0] = [0,8]
@@ -208,33 +239,45 @@ fn get_index_by_coords_and_orientation(x: usize, y: usize, width: usize, row_cou
 
             new_y * width + new_x
         }
-
     }
 }
 
-/// Always rotate to the left (N -> W -> S -> E)
-fn rotate_grid(grid: &mut Vec<char>, width: usize) -> Vec<char> {
-    let mut new_grid = vec![];
-
-    let rows_count = grid.len() / width;
-    let mut y = rows_count - 1; // last row
-    let mut x = 0; // first column
-
-    loop {
-        new_grid.push(grid[y * width + x]);
-
-        if y == 0 {
-            y = rows_count;
-            x += 1;
-            if x == width {
-                break;
-            }
+fn get_coords_from_index_and_orientation(
+    index: usize,
+    width: usize,
+    row_count: usize,
+    orientation: &Orientation,
+) -> (usize, usize) {
+    match orientation {
+        Orientation::North => (index % width, index / width),
+        Orientation::West => {
+            // 0 = [9,0]
+            // 10 = [8,0]
+            // 11 = [8,1]
+            // 99 = [0,9]
+            let x = row_count - (index / row_count) - 1;
+            let y = index % width;
+            (x, y)
         }
+        Orientation::South => {
+            // 10x10 grid
+            // 0 = [9,9]
+            // 99 = [0,0]
+            let x = width - (index % width) - 1;
+            let y = row_count - (index / row_count) - 1;
 
-        y -= 1;
+            (x, y)
+        }
+        Orientation::East => {
+            // 0 = [0,9]
+            // 99 = [9,0]
+            // 9 = [0,0]
+            let x = index / row_count;
+            let y = width - (index % width) - 1;
+
+            (x, y)
+        }
     }
-
-    new_grid
 }
 
 fn print_grid(grid: &[char], width: usize) {
@@ -259,13 +302,52 @@ fn print_grid(grid: &[char], width: usize) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{get_index_by_coords_and_orientation, Orientation};
+    use crate::{
+        get_coords_from_index_and_orientation, get_index_by_coords_and_orientation, Orientation,
+    };
 
     #[test]
     fn test_get_coords() {
-        assert_eq!(get_index_by_coords_and_orientation(0, 0, 10, 10, &Orientation::North), 0);
-        assert_eq!(get_index_by_coords_and_orientation(0, 0, 10, 10, &Orientation::West), 90);
-        assert_eq!(get_index_by_coords_and_orientation(0, 0, 10, 10, &Orientation::South), 99);
-        assert_eq!(get_index_by_coords_and_orientation(0, 0, 10, 10, &Orientation::East), 9);
+        assert_eq!(
+            get_index_by_coords_and_orientation(0, 0, 10, 10, &Orientation::North),
+            0
+        );
+        assert_eq!(
+            get_index_by_coords_and_orientation(0, 0, 10, 10, &Orientation::West),
+            90
+        );
+        assert_eq!(
+            get_index_by_coords_and_orientation(0, 0, 10, 10, &Orientation::South),
+            99
+        );
+        assert_eq!(
+            get_index_by_coords_and_orientation(0, 0, 10, 10, &Orientation::East),
+            9
+        );
+    }
+
+    #[test]
+    fn test_get_index() {
+        // assert_eq!(get_index_by_coords_and_orientation(0, 0, 10, 10, &Orientation::North), 0);
+        assert_eq!(
+            get_coords_from_index_and_orientation(0, 10, 10, &Orientation::West),
+            (9, 0)
+        );
+        assert_eq!(
+            get_coords_from_index_and_orientation(99, 10, 10, &Orientation::West),
+            (0, 9)
+        );
+        assert_eq!(
+            get_coords_from_index_and_orientation(0, 10, 10, &Orientation::South),
+            (9, 9)
+        );
+        assert_eq!(
+            get_coords_from_index_and_orientation(0, 10, 10, &Orientation::East),
+            (0, 9)
+        );
+        assert_eq!(
+            get_coords_from_index_and_orientation(99, 10, 10, &Orientation::East),
+            (9, 0)
+        );
     }
 }
