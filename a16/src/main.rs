@@ -81,25 +81,124 @@ fn main() -> Result<(), io::Error> {
         }
     }
 
-    print_grid(&grid, width);
+    // print_grid(&grid, width);
 
+    let result = find_energized_count(0, Direction::Right, &grid, width);
+    println!("Part 1 result: {}", result);
+
+    // Part 2
+    let rows = grid.len() / width;
+    let mut results = vec![];
+    for y in 0..rows {
+        for x in 0..width {
+            if x == 0 && y == 0 {
+                // right + down
+                results.push(result); // already done this before
+                results.push(find_energized_count(0, Direction::Down, &grid, width));
+            } else if x == width - 1 && y == 0 {
+                // left + down
+                results.push(find_energized_count(
+                    y * rows + x,
+                    Direction::Left,
+                    &grid,
+                    width,
+                ));
+                results.push(find_energized_count(
+                    y * rows + x,
+                    Direction::Down,
+                    &grid,
+                    width,
+                ));
+            } else if x == 0 && y == rows - 1 {
+                // right + up
+                results.push(find_energized_count(
+                    y * rows + x,
+                    Direction::Right,
+                    &grid,
+                    width,
+                ));
+                results.push(find_energized_count(
+                    y * rows + x,
+                    Direction::Up,
+                    &grid,
+                    width,
+                ));
+            } else if x == width - 1 && y == rows - 1 {
+                // left + up
+                results.push(find_energized_count(
+                    y * rows + x,
+                    Direction::Left,
+                    &grid,
+                    width,
+                ));
+                results.push(find_energized_count(
+                    y * rows + x,
+                    Direction::Up,
+                    &grid,
+                    width,
+                ));
+            } else if x == 0 {
+                // right
+                results.push(find_energized_count(
+                    y * rows + x,
+                    Direction::Right,
+                    &grid,
+                    width,
+                ));
+            } else if x == width - 1 {
+                // left
+                results.push(find_energized_count(
+                    y * rows + x,
+                    Direction::Left,
+                    &grid,
+                    width,
+                ));
+            } else if y == 0 {
+                // down
+                results.push(find_energized_count(
+                    y * rows + x,
+                    Direction::Down,
+                    &grid,
+                    width,
+                ));
+            } else if y == rows - 1 {
+                // up
+                results.push(find_energized_count(
+                    y * rows + x,
+                    Direction::Up,
+                    &grid,
+                    width,
+                ));
+            }
+        }
+    }
+
+    results.sort();
+
+    println!("Part 2 result: {}", results.last().unwrap());
+
+    Ok(())
+}
+
+fn find_energized_count(
+    position: usize,
+    direction: Direction,
+    grid: &Vec<Type>,
+    width: usize,
+) -> usize {
     let mut path = vec![];
     let start = Beam {
-        position: 0,
-        direction: Direction::Right,
+        position,
+        direction,
     };
 
-    light_travel(start, &grid, width, &mut path);
+    light_travel(start, grid, width, &mut path);
 
     let mut positions: Vec<usize> = path.iter().map(|b| b.position).collect();
     positions.sort();
     positions.dedup();
 
-    print_energized(&positions, &grid, width);
-
-    println!("Part 1 result: {}", positions.len());
-
-    Ok(())
+    positions.len()
 }
 
 fn light_travel(beam: Beam, grid: &Vec<Type>, width: usize, path: &mut Vec<Beam>) {
