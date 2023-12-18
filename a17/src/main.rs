@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::BufRead;
@@ -27,24 +28,35 @@ fn main() -> Result<(), io::Error> {
 
     let previous = dijkstra(&grid, width, 0, grid.len() - 1);
 
-    let mut p = previous[grid.len() - 1];
-    let mut path = vec![grid.len() - 1];
-    loop {
-        match p {
-            None => {
-                break;
-            }
-            Some(n) => {
-                path.push(n);
-                p = previous[n];
-            }
+    // println!("{:?}", previous);
+
+    let mut ps = vec![];
+
+    for (node, prev_node) in previous.iter() {
+        if node.0 == grid.len() - 1 {
+            ps.push(prev_node);
         }
     }
 
-    path.reverse();
-    println!("{:?}", path);
+    let mut sum = u32::MAX;
+    for p_i in ps.iter() {
+        let mut path = vec![grid.len() - 1];
+        let mut p = p_i.clone();
+        loop {
+            path.push(p.0);
+            p = match previous.get(p) {
+                None => {
+                    break;
+                }
+                Some(pr) => pr,
+            };
+        }
 
-    let sum: u32 = path.iter().map(|i| grid[*i]).sum();
+        path.reverse();
+        println!("{:?}", path);
+
+        sum = min(sum, path.iter().map(|i| grid[*i]).sum());
+    }
 
     println!("Part 1 result: {}", sum - grid[0]);
 
@@ -76,134 +88,190 @@ fn main() -> Result<(), io::Error> {
     Ok(())
 }
 
-fn min_distance(distances: &Vec<u32>, spt_set: &Vec<bool>) -> usize {
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+enum Direction {
+    Up,
+    Left,
+    Down,
+    Right,
+}
+
+fn min_distance(distances: &Distances, spt_set: &Closed) -> ((usize, u8, Direction), u32) {
     let min = distances
         .iter()
-        .enumerate()
-        .filter(|(k, _v)| !spt_set[*k])
+        .filter(|(k, _v)| !spt_set.contains_key(*k))
         .min_by_key(|(_k, v)| **v)
         .unwrap();
 
-    min.0
+    (min.0.clone(), *min.1)
 }
 
 fn get_neighbors(
-    index: usize,
+    index: &(usize, u8, Direction),
     graph: &[u32],
     width: usize,
-    spt_set: &Vec<bool>,
-    previous: &Vec<Option<usize>>,
-) -> Vec<usize> {
+    spt_set: &Closed,
+    previous: &Previous,
+) -> Vec<(usize, u8, Direction)> {
     let mut result = vec![];
 
-    let x = index % width;
-    let y = index / width;
+    let x = index.0 % width;
+    let y = index.0 / width;
     let rows = graph.len() / width;
+
+    let prev = previous.get(&index);
 
     if x == 0 {
         // right
-        result.push(index + 1);
+        result.push((
+            index.0 + 1,
+            match index.2 {
+                Direction::Right => index.1 + 1,
+                _ => 0,
+            },
+            Direction::Right,
+        ));
     } else if x == width - 1 {
         // left
-        result.push(index - 1);
+        result.push((
+            index.0 - 1,
+            match index.2 {
+                Direction::Left => index.1 + 1,
+                _ => 0,
+            },
+            Direction::Left,
+        ));
     } else {
         // both
-        result.push(index + 1);
-        result.push(index - 1);
+        result.push((
+            index.0 + 1,
+            match index.2 {
+                Direction::Right => index.1 + 1,
+                _ => 0,
+            },
+            Direction::Right,
+        ));
+        result.push((
+            index.0 - 1,
+            match index.2 {
+                Direction::Left => index.1 + 1,
+                _ => 0,
+            },
+            Direction::Left,
+        ));
     }
 
     if y == 0 {
         // down
-        result.push(index + width);
+        result.push((
+            index.0 + width,
+            match index.2 {
+                Direction::Down => index.1 + 1,
+                _ => 0,
+            },
+            Direction::Down,
+        ));
     } else if y == rows - 1 {
         // up
-        result.push(index - width);
+        result.push((
+            index.0 - width,
+            match index.2 {
+                Direction::Up => index.1 + 1,
+                _ => 0,
+            },
+            Direction::Up,
+        ));
     } else {
         // both
-        result.push(index + width);
-        result.push(index - width);
+        result.push((
+            index.0 + width,
+            match index.2 {
+                Direction::Down => index.1 + 1,
+                _ => 0,
+            },
+            Direction::Down,
+        ));
+        result.push((
+            index.0 - width,
+            match index.2 {
+                Direction::Up => index.1 + 1,
+                _ => 0,
+            },
+            Direction::Up,
+        ));
     }
 
     result = result
         .iter()
         .filter(|v| {
-            if spt_set[**v] {
+            if v.1 >= 3 {
                 return false;
             }
 
-            match previous[index] {
+            match spt_set.get(*v) {
+                None => {}
+                Some(_) => {
+                    return false;
+                }
+            }
+
+            match prev {
                 None => {
                     return true;
                 }
                 Some(p1) => {
                     // don't go back
-                    if p1 == **v {
+                    if p1.0 == v.0 {
                         return false;
-                    }
-
-                    match previous[p1] {
-                        None => {
-                            return true;
-                        }
-                        Some(p2) => match previous[p2] {
-                            None => {
-                                return true;
-                            }
-                            Some(p3) => {
-                                if (index % width == p1 % width
-                                    && p1 % width == p2 % width
-                                    && p2 % width == p3 % width
-                                    && p3 % width == **v % width)
-                                    || (index / width == p1 / width
-                                        && p1 / width == p2 / width
-                                        && p2 / width == p3 / width
-                                        && p3 / width == **v / width)
-                                {
-                                    return false;
-                                }
-                            }
-                        },
                     }
                 }
             }
 
             true
         })
-        .map(|v| *v)
-        .collect::<Vec<usize>>();
+        .map(|v| v.clone())
+        .collect::<Vec<(usize, u8, Direction)>>();
 
     result
 }
 
-fn dijkstra(graph: &[u32], width: usize, start: usize, end: usize) -> Vec<Option<usize>> {
-    let mut distances = vec![u32::MAX; graph.len()];
-    let mut spt_set = vec![false; graph.len()];
-    let mut previous: Vec<Option<usize>> = vec![None; graph.len()];
+type Distances = HashMap<(usize, u8, Direction), u32>;
+type Closed = HashMap<(usize, u8, Direction), bool>;
+type Previous = HashMap<(usize, u8, Direction), (usize, u8, Direction)>;
 
-    distances[start] = 0;
+fn dijkstra(graph: &[u32], width: usize, start: usize, end: usize) -> Previous {
+    // position, step count, direction (0 = north, 1 = west, 2 = south, 3 = east)
+    let mut distances: Distances = Distances::new();
+    let mut spt_set: Closed = Closed::new();
+    let mut previous: Previous = Previous::new();
+
+    distances.insert((0, 0, Direction::Right), 0);
+    distances.insert((0, 0, Direction::Down), 0);
 
     loop {
         let md = min_distance(&distances, &spt_set);
 
-        // if md == end {
-        //     break;
-        // }
+        if md.0 .0 == end {
+            break;
+        }
 
-        spt_set[md] = true;
+        spt_set.insert(md.0.clone(), true);
 
-        let neighbors = get_neighbors(md, &graph, width, &spt_set, &previous);
+        let neighbors = get_neighbors(&md.0, &graph, width, &spt_set, &previous);
         for n in neighbors.iter() {
-            let alt = distances[md] + graph[*n];
+            let alt = md.1 + graph[n.0];
 
-            if alt < distances[*n] {
-                distances[*n] = alt;
-                previous[*n] = Some(md);
+            let mut n_entry = distances.entry(n.clone()).or_insert(u32::MAX);
+
+            if &alt < n_entry {
+                *n_entry = alt;
+                previous.insert(n.clone(), md.0.clone());
             }
         }
 
-        if spt_set.iter().all(|v| *v == true) {
-            break;
-        }
+        // if spt_set.iter().all(|(_k, v)| v == true) {
+        //     break;
+        // }
     }
 
     previous
