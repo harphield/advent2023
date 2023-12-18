@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::fs::File;
 use std::io;
 use std::io::BufRead;
@@ -47,28 +48,30 @@ fn main() -> Result<(), io::Error> {
 
     println!("Part 1 result: {}", sum - grid[0]);
 
-    let result = a_star(&grid, width, 0, grid.len() - 1);
+    // let result = a_star(&grid, width, 0, grid.len() - 1);
 
     // println!("{:?}", n);
 
-    for n in result {
-        let mut sum = 0;
-        let mut p = Some(Rc::new(n));
-        loop {
-            match &p {
-                None => {
-                    break;
-                }
-                Some(pv) => {
-                    print!("{}, ", pv.position);
-                    sum += grid[pv.position];
-                    p = pv.parent.clone();
-                }
-            }
-        }
+    // for n in result {
+    //     let mut sum = 0;
+    //     let mut p = Some(Rc::new(n));
+    //     loop {
+    //         match &p {
+    //             None => {
+    //                 break;
+    //             }
+    //             Some(pv) => {
+    //                 print!("{}, ", pv.position);
+    //                 sum += grid[pv.position];
+    //                 p = pv.parent.clone();
+    //             }
+    //         }
+    //     }
+    //
+    //     println!("Part 1 result: {}", sum - grid[0]);
+    // }
 
-        println!("Part 1 result: {}", sum - grid[0]);
-    }
+    // println!("Part 1 result: {}", result);
 
     Ok(())
 }
@@ -241,39 +244,18 @@ fn get_neighbors_a(node: &Node, graph: &[u32], width: usize) -> Vec<usize> {
         .iter()
         .filter(|v| {
             match &node.parent {
-                None => {
-                    return true;
-                }
-                Some(p1) => {
-                    // don't go back
-                    if p1.position == **v {
+                None => {}
+                Some(p) => {
+                    if p.position == **v {
                         return false;
                     }
-
-                    match &p1.parent {
-                        None => {
-                            return true;
-                        }
-                        Some(p2) => match &p2.parent {
-                            None => {
-                                return true;
-                            }
-                            Some(p3) => {
-                                if (node.position % width == p1.position % width
-                                    && p1.position % width == p2.position % width
-                                    && p2.position % width == p3.position % width
-                                    && p3.position % width == **v % width)
-                                    || (node.position / width == p1.position / width
-                                        && p1.position / width == p2.position / width
-                                        && p2.position / width == p3.position / width
-                                        && p3.position / width == **v / width)
-                                {
-                                    return false;
-                                }
-                            }
-                        },
-                    }
                 }
+            }
+
+            if (node.straight_count.0 == 3 && (node.position % width == **v % width))
+                || (node.straight_count.1 == 3 && (node.position / width == **v / width))
+            {
+                return false;
             }
 
             true
@@ -296,27 +278,32 @@ fn get_distance(graph: &[u32], width: usize, source: usize, destination: usize) 
 #[derive(Clone, Debug)]
 struct Node {
     position: usize,
+    straight_count: (u8, u8),
     f: u32,
     g: u32,
     h: u32,
     parent: Option<Rc<Node>>,
 }
 
-fn a_star(graph: &[u32], width: usize, start: usize, end: usize) -> Vec<Node> {
+fn a_star(graph: &[u32], width: usize, start: usize, end: usize) -> u32 {
     let start_node = Node {
         position: start,
+        straight_count: (1, 1),
         f: 0,
         g: 0,
         h: 0,
         parent: None,
     };
 
-    let mut results = vec![];
+    // let mut results = vec![];
 
     let mut open = vec![start_node];
     let mut closed: Vec<Node> = vec![];
 
     let mut stop = false;
+
+    let mut min_length = u32::MAX;
+
     loop {
         if open.is_empty() {
             break;
@@ -330,6 +317,30 @@ fn a_star(graph: &[u32], width: usize, start: usize, end: usize) -> Vec<Node> {
         for n in neighbors.iter() {
             let mut neighbor = Node {
                 position: *n,
+                straight_count: {
+                    match &q.parent {
+                        None => {
+                            if q.position == start {
+                                (1, 1)
+                            } else {
+                                (0, 0)
+                            }
+                        }
+                        Some(p) => {
+                            if (p.position % width == q.position % width)
+                                && (q.position % width == *n % width)
+                            {
+                                (q.straight_count.0 + 1, 0)
+                            } else if (p.position / width == q.position / width)
+                                && (q.position / width == *n / width)
+                            {
+                                (0, q.straight_count.1 + 1)
+                            } else {
+                                (1, 1)
+                            }
+                        }
+                    }
+                },
                 f: 0,
                 g: 0,
                 h: 0,
@@ -337,7 +348,10 @@ fn a_star(graph: &[u32], width: usize, start: usize, end: usize) -> Vec<Node> {
             };
 
             if *n == end {
-                results.push(neighbor.clone());
+                // results.push(neighbor.clone());
+                min_length = min(min_length, q.g + graph[neighbor.position]);
+
+                // continue;
                 stop = true;
                 break;
             }
@@ -346,20 +360,22 @@ fn a_star(graph: &[u32], width: usize, start: usize, end: usize) -> Vec<Node> {
             neighbor.h = get_distance(&graph, width, *n, end);
             neighbor.f = neighbor.g + neighbor.h;
 
-            match open
-                .iter()
-                .find(|o| o.position == neighbor.position && o.f < neighbor.f)
-            {
+            match open.iter().find(|o| {
+                o.position == neighbor.position
+                    && o.straight_count == neighbor.straight_count
+                    && o.f < neighbor.f
+            }) {
                 None => {}
                 Some(_) => {
                     continue;
                 }
             }
 
-            match closed
-                .iter()
-                .find(|o| o.position == neighbor.position && o.f < neighbor.f)
-            {
+            match closed.iter().find(|o| {
+                o.position == neighbor.position
+                    && o.straight_count == neighbor.straight_count
+                    && o.f < neighbor.f
+            }) {
                 None => {}
                 Some(_) => {
                     continue;
@@ -376,5 +392,5 @@ fn a_star(graph: &[u32], width: usize, start: usize, end: usize) -> Vec<Node> {
         }
     }
 
-    results
+    min_length
 }
