@@ -59,20 +59,27 @@ fn main() -> Result<(), io::Error> {
     let mut max_x_2 = i32::MIN;
     let mut max_y_2 = i32::MIN;
 
-    let mut x_offset = 0;
-    let mut y_offset = 0;
+    let mut add_to_area = 1u64; // why?
 
-    for (direction, distance, _color) in plan.iter() {
-        let start = match vertices.last() {
+    for pi in 0..plan.len() {
+        let (direction, distance, _color) = &plan[pi];
+
+        let previous = match vertices.last() {
             None => (0i32, 0i32),
             Some(v) => *v,
         };
 
         let next = match direction {
-            Direction::Up => (start.0, start.1 - *distance as i32),
-            Direction::Down => (start.0, start.1 + *distance as i32),
-            Direction::Left => (start.0 - *distance as i32, start.1),
-            Direction::Right => (start.0 + *distance as i32, start.1),
+            Direction::Up => (previous.0, previous.1 - *distance as i32),
+            Direction::Down => {
+                add_to_area += *distance as u64;
+                (previous.0, previous.1 + *distance as i32)
+            },
+            Direction::Left => (previous.0 - *distance as i32, previous.1),
+            Direction::Right => {
+                add_to_area += *distance as u64;
+                (previous.0 + *distance as i32, previous.1)
+            },
         };
 
         min_x = min(min_x, next.0);
@@ -82,23 +89,17 @@ fn main() -> Result<(), io::Error> {
 
         vertices.push(next);
 
-        // part 2 will use color for numbers
-        let start_2 = match vertices_2.last() {
+        // TODO part 2 will use color for numbers
+        let previous_2 = match vertices_2.last() {
             None => (0i32, 0i32),
             Some(v) => *v,
         };
 
         let next_2 = match direction {
-            Direction::Up => (start_2.0, y_offset + start_2.1 - *distance as i32),
-            Direction::Down => {
-                y_offset += 1;
-                (start_2.0, 1 + start_2.1 + *distance as i32)
-            },
-            Direction::Left => (x_offset + start_2.0 - *distance as i32, start_2.1),
-            Direction::Right => {
-                x_offset += 1;
-                (1 + start_2.0 + *distance as i32, start_2.1)
-            },
+            Direction::Up => (previous_2.0, previous_2.1 - *distance as i32),
+            Direction::Down => (previous_2.0, previous_2.1 + *distance as i32),
+            Direction::Left => (previous_2.0 - *distance as i32, previous_2.1),
+            Direction::Right => (previous_2.0 + *distance as i32, previous_2.1),
         };
 
         min_x_2 = min(min_x_2, next_2.0);
@@ -108,8 +109,6 @@ fn main() -> Result<(), io::Error> {
 
         vertices_2.push(next_2);
     }
-
-    println!("{:?}", vertices);
 
     // normalize vertices
     let mut normalized_vertices = vec![];
@@ -128,9 +127,12 @@ fn main() -> Result<(), io::Error> {
     let mut grid = vec!['.'; width * height];
 
     // normalize 2
+    println!("{:?}", vertices_2);
+
+    // normalize vertices
     let mut normalized_vertices_2 = vec![];
     for v in vertices_2.iter() {
-        normalized_vertices_2.push((v.0 - min_x, v.1 - min_y));
+        normalized_vertices_2.push((v.0 - min_x_2, v.1 - min_y_2));
     }
 
     vertices_2 = normalized_vertices_2;
@@ -142,6 +144,14 @@ fn main() -> Result<(), io::Error> {
     let height_2 = max_y_2 as usize + 1;
 
     let mut grid_2 = vec!['.'; width_2 * height_2];
+
+    // TESTING PART 2
+    // let vertices = vertices_2;
+    // let mut grid = grid_2;
+    // let width = width_2;
+    /////
+
+    println!("{:?}", vertices);
 
     let mut border = vec![];
     let mut vertex_indexes = vec![];
@@ -250,9 +260,9 @@ fn main() -> Result<(), io::Error> {
         }
     }
 
-    println!("{}", inside);
+    println!("Real result: {}", inside);
 
-    let a = area(&vertices);
+    let a = area(&vertices) + add_to_area;
 
     println!("Area: {}", a);
 
