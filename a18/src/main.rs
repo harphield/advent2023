@@ -48,10 +48,20 @@ fn main() -> Result<(), io::Error> {
     }
 
     let mut vertices: Vec<(i32, i32)> = vec![];
+    let mut vertices_2: Vec<(i32, i32)> = vec![];
     let mut min_x = i32::MAX;
     let mut min_y = i32::MAX;
     let mut max_x = i32::MIN;
     let mut max_y = i32::MIN;
+
+    let mut min_x_2 = i32::MAX;
+    let mut min_y_2 = i32::MAX;
+    let mut max_x_2 = i32::MIN;
+    let mut max_y_2 = i32::MIN;
+
+    let mut x_offset = 0;
+    let mut y_offset = 0;
+
     for (direction, distance, _color) in plan.iter() {
         let start = match vertices.last() {
             None => (0i32, 0i32),
@@ -71,6 +81,32 @@ fn main() -> Result<(), io::Error> {
         max_y = max(max_y, next.1);
 
         vertices.push(next);
+
+        // part 2 will use color for numbers
+        let start_2 = match vertices_2.last() {
+            None => (0i32, 0i32),
+            Some(v) => *v,
+        };
+
+        let next_2 = match direction {
+            Direction::Up => (start_2.0, y_offset + start_2.1 - *distance as i32),
+            Direction::Down => {
+                y_offset += 1;
+                (start_2.0, 1 + start_2.1 + *distance as i32)
+            },
+            Direction::Left => (x_offset + start_2.0 - *distance as i32, start_2.1),
+            Direction::Right => {
+                x_offset += 1;
+                (1 + start_2.0 + *distance as i32, start_2.1)
+            },
+        };
+
+        min_x_2 = min(min_x_2, next_2.0);
+        min_y_2 = min(min_y_2, next_2.1);
+        max_x_2 = max(max_x_2, next_2.0);
+        max_y_2 = max(max_y_2, next_2.1);
+
+        vertices_2.push(next_2);
     }
 
     println!("{:?}", vertices);
@@ -89,9 +125,24 @@ fn main() -> Result<(), io::Error> {
     let width = max_x as usize + 1;
     let height = max_y as usize + 1;
 
-    println!("{:?}", vertices);
-
     let mut grid = vec!['.'; width * height];
+
+    // normalize 2
+    let mut normalized_vertices_2 = vec![];
+    for v in vertices_2.iter() {
+        normalized_vertices_2.push((v.0 - min_x, v.1 - min_y));
+    }
+
+    vertices_2 = normalized_vertices_2;
+
+    max_x_2 -= min_x_2;
+    max_y_2 -= min_y_2;
+
+    let width_2 = max_x_2 as usize + 1;
+    let height_2 = max_y_2 as usize + 1;
+
+    let mut grid_2 = vec!['.'; width_2 * height_2];
+
     let mut border = vec![];
     let mut vertex_indexes = vec![];
 
@@ -201,6 +252,10 @@ fn main() -> Result<(), io::Error> {
 
     println!("{}", inside);
 
+    let a = area(&vertices);
+
+    println!("Area: {}", a);
+
     Ok(())
 }
 
@@ -214,4 +269,20 @@ fn draw_grid(grid: &[char], width: &usize) {
     }
 
     println!();
+}
+
+fn area(vertices: &[(i32, i32)]) -> u64 {
+    let mut result = 0i64;
+
+    for (i, v) in vertices.iter().enumerate() {
+        let pv = if i == 0 {
+            vertices.get(vertices.len() - 1).unwrap()
+        } else {
+            vertices.get(i - 1).unwrap()
+        };
+
+        result += (pv.0 + v.0) as i64 * (pv.1 - v.1) as i64;
+    }
+
+    (result / 2).abs() as u64
 }
