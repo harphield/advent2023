@@ -1,25 +1,28 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::BufRead;
 
 enum Pulse {
-    Low,
-    High,
+    Low(String),
+    High(String),
 }
 
 trait Module<T> {
-    fn create(destinations: Vec<String>) -> T;
+    fn create(name: &String, destinations: Vec<String>) -> T;
     fn accept_pulse(&mut self, pulse: Pulse) -> Option<(Pulse, Vec<String>)>;
 }
 
 struct FlipFlop {
+    name: String,
     state: bool,
     destinations: Vec<String>,
 }
 
 impl Module<FlipFlop> for FlipFlop {
-    fn create(destinations: Vec<String>) -> FlipFlop {
+    fn create(name: &String, destinations: Vec<String>) -> FlipFlop {
         FlipFlop {
+            name: name.clone(),
             state: false,
             destinations,
         }
@@ -27,17 +30,21 @@ impl Module<FlipFlop> for FlipFlop {
 
     fn accept_pulse(&mut self, pulse: Pulse) -> Option<(Pulse, Vec<String>)> {
         match pulse {
-            Pulse::Low => {
+            Pulse::Low(_) => {
                 self.state = !self.state;
 
                 Some((
-                    if self.state { Pulse::High } else { Pulse::Low },
+                    if self.state { Pulse::High(self.name.clone()) } else { Pulse::Low },
                     self.destinations.clone(),
                 ))
             }
-            Pulse::High => None
+            Pulse::High(_) => None
         }
     }
+}
+
+struct Conjunction {
+    inputs: HashMap<String, Pulse>
 }
 
 fn main() -> Result<(), io::Error> {
