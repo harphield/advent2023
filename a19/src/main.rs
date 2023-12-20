@@ -150,3 +150,45 @@ fn apply_workflows(workflows: &HashMap<String, Vec<String>>, part: &Part, re_rul
 
     out
 }
+
+fn try_workflows(workflows: &HashMap<String, Vec<String>>, re_rule: &Regex, wf_name: &String) -> u64 {
+    let rules = workflows.get(wf_name).unwrap();
+
+    let out = 0;
+
+    for rule in rules.iter() {
+        if rule.contains(':') {
+            // <> rule
+            let c = re_rule
+                .captures(rule)
+                .unwrap()
+                .iter()
+                .map(|c| c.unwrap().as_str())
+                .collect::<Vec<&str>>();
+
+            let comparator = c[2];
+            let value = c[3].parse::<u32>().unwrap();
+            let result = c[4].to_string();
+
+            // TODO comparator stuff
+            // TODO 1 to value and value to 4000
+
+            if result == "A" {
+                break;
+            } else if result == "R" {
+                return 0;
+            } else {
+                try_workflows(&workflows, &re_rule, &result);
+            }
+        } else if rule == "A" {
+            break;
+        } else if rule == "R" {
+            break;
+        } else {
+            try_workflows(&workflows, &re_rule, &rule);
+            break;
+        }
+    }
+
+    out
+}
