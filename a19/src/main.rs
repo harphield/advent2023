@@ -65,8 +65,6 @@ fn main() -> Result<(), io::Error> {
         }
     }
 
-    println!("{:?}", parts);
-
     let mut sum = 0;
     for p in parts.iter() {
         sum += apply_workflows(&workflows, p, &re_rule);
@@ -74,18 +72,24 @@ fn main() -> Result<(), io::Error> {
 
     println!("Part 1 result: {}", sum);
 
+    let p2 = try_workflows(
+        &workflows,
+        &re_rule,
+        &"in".to_string(),
+        &[(1u32, 4000u32); 4],
+    );
+
+    println!("Part 2 result: {}", p2);
+
     Ok(())
 }
 
 fn apply_workflows(workflows: &HashMap<String, Vec<String>>, part: &Part, re_rule: &Regex) -> u32 {
-    println!("part {}", part.x);
-
     let mut out = 0;
 
     let mut wf_name = "in".to_string();
     let mut stop = false;
     loop {
-        println!("wf: {}", wf_name);
         let rules = workflows.get(&wf_name).unwrap();
 
         for rule in rules.iter() {
@@ -97,7 +101,7 @@ fn apply_workflows(workflows: &HashMap<String, Vec<String>>, part: &Part, re_rul
                     .iter()
                     .map(|c| c.unwrap().as_str())
                     .collect::<Vec<&str>>();
-                println!("{:?}", c);
+
                 let letter = c[1];
                 let comparator = c[2];
                 let value = c[3].parse::<u32>().unwrap();
@@ -151,10 +155,27 @@ fn apply_workflows(workflows: &HashMap<String, Vec<String>>, part: &Part, re_rul
     out
 }
 
-fn try_workflows(workflows: &HashMap<String, Vec<String>>, re_rule: &Regex, wf_name: &String) -> u64 {
+fn try_workflows(
+    workflows: &HashMap<String, Vec<String>>,
+    re_rule: &Regex,
+    wf_name: &String,
+    ranges: &[(u32, u32); 4],
+) -> u128 {
     let rules = workflows.get(wf_name).unwrap();
 
-    let out = 0;
+    let mut out: u128 = 0;
+
+    let mut new_ranges = *ranges;
+
+    // println!(
+    //     "{} {}",
+    //     wf_name,
+    //     new_ranges
+    //         .iter()
+    //         .map(|(s, e)| (e - s) as u128 + 1)
+    //         .reduce(|acc, v| acc * v)
+    //         .unwrap()
+    // );
 
     for rule in rules.iter() {
         if rule.contains(':') {
@@ -166,26 +187,60 @@ fn try_workflows(workflows: &HashMap<String, Vec<String>>, re_rule: &Regex, wf_n
                 .map(|c| c.unwrap().as_str())
                 .collect::<Vec<&str>>();
 
+            let letter_index = match c[1] {
+                "x" => 0,
+                "m" => 1,
+                "a" => 2,
+                "s" => 3,
+                _ => panic!("aaaa"),
+            };
+
             let comparator = c[2];
             let value = c[3].parse::<u32>().unwrap();
             let result = c[4].to_string();
 
-            // TODO comparator stuff
-            // TODO 1 to value and value to 4000
+            let mut yes = false;
+            let mut reversed_range = new_ranges[letter_index];
+            if comparator == "<" {
+                // compare with ranges[letter_index]
+                if new_ranges[letter_index].0 < value {
+                    yes = true;
+                    new_ranges[letter_index].1 = value - 1;
+                    reversed_range.0 = value;
+                }
+            } else if comparator == ">" {
+                // compare with ranges[letter_index]
+                if new_ranges[letter_index].1 > value {
+                    yes = true;
+                    new_ranges[letter_index].0 = value + 1;
+                    reversed_range.1 = value;
+                }
+            }
 
-            if result == "A" {
-                break;
-            } else if result == "R" {
-                return 0;
-            } else {
-                try_workflows(&workflows, &re_rule, &result);
+            if yes {
+                if result == "A" {
+                    out += new_ranges
+                        .iter()
+                        .map(|(s, e)| (e - s) as u128 + 1)
+                        .reduce(|acc, v| acc * v)
+                        .unwrap();
+                } else if result != "R" {
+                    out += try_workflows(workflows, re_rule, &result, &new_ranges);
+                }
+
+                new_ranges[letter_index] = reversed_range;
             }
         } else if rule == "A" {
+            out += new_ranges
+                .iter()
+                .map(|(s, e)| (e - s) as u128 + 1)
+                .reduce(|acc, v| acc * v)
+                .unwrap();
             break;
         } else if rule == "R" {
             break;
         } else {
-            try_workflows(&workflows, &re_rule, &rule);
+            out += try_workflows(workflows, re_rule, rule, &new_ranges);
             break;
         }
     }
