@@ -150,10 +150,7 @@ fn main() -> Result<(), io::Error> {
                 } else if s[0].starts_with('&') {
                     // conjunction
                     let name = &s[0][1..];
-                    conjunctions.insert(
-                        name.to_string(),
-                        Conjunction::create(name, destinations),
-                    );
+                    conjunctions.insert(name.to_string(), Conjunction::create(name, destinations));
                     name
                 } else {
                     panic!("oh no");
@@ -178,14 +175,18 @@ fn main() -> Result<(), io::Error> {
     let mut low_pulses = 0;
     let mut high_pulses = 0;
 
-    let mut rx_hit_presses = 0;
+    let mut tx_high = 0;
+    let mut dd_high = 0;
+    let mut nz_high = 0;
+    let mut ph_high = 0;
 
-    for i in 0..1000 {
+    let mut i = 0;
+    let mut stop = false;
+    loop {
         let mut queue = vec![(Pulse::Low("".to_string()), "broadcaster".to_string())];
-        low_pulses += 1;
-
-        let mut rx_high_hits = 0;
-        let mut rx_low_hits = 0;
+        if i < 1000 {
+            low_pulses += 1;
+        }
 
         loop {
             // println!("{:?}", queue);
@@ -196,30 +197,39 @@ fn main() -> Result<(), io::Error> {
             let (pulse, destination) = queue.pop().unwrap();
             match modules_except_cons.get_mut(&destination) {
                 None => match conjunctions.get_mut(&destination) {
-                    None => {
-                        if destination == "rx" {
-                            match pulse {
-                                Pulse::Low(_) => {
-                                    rx_low_hits += 1;
-                                }
-                                Pulse::High(_) => {
-                                    rx_high_hits += 1;
-                                }
-                            }
-                        }
-                    }
+                    None => {}
                     Some(c) => match c.accept_pulse(&pulse) {
                         None => {}
                         Some((r_pulse, r_destinations)) => {
                             for d in r_destinations.iter() {
                                 queue.insert(0, (r_pulse.clone(), d.clone()));
 
-                                match r_pulse {
+                                match &r_pulse {
                                     Pulse::Low(_) => {
-                                        low_pulses += 1;
+                                        if i < 1000 {
+                                            low_pulses += 1;
+                                        }
                                     }
-                                    Pulse::High(_) => {
-                                        high_pulses += 1;
+                                    Pulse::High(from) => {
+                                        if d == "ls" {
+                                            // all of these need to send HIGH at the same time...
+                                            if from == "tx" && tx_high == 0 {
+                                                tx_high = i + 1;
+                                            } else if from == "dd" && dd_high == 0 {
+                                                dd_high = i + 1;
+                                            } else if from == "nz" && nz_high == 0 {
+                                                nz_high = i + 1;
+                                            } else if from == "ph" && ph_high == 0 {
+                                                ph_high = i + 1;
+                                            } else if i > 1000 {
+                                                stop = true;
+                                                break;
+                                            }
+                                        }
+
+                                        if i < 1000 {
+                                            high_pulses += 1;
+                                        }
                                     }
                                 }
                             }
@@ -234,10 +244,14 @@ fn main() -> Result<(), io::Error> {
 
                             match r_pulse {
                                 Pulse::Low(_) => {
-                                    low_pulses += 1;
+                                    if i < 1000 {
+                                        low_pulses += 1;
+                                    }
                                 }
                                 Pulse::High(_) => {
-                                    high_pulses += 1;
+                                    if i < 1000 {
+                                        high_pulses += 1;
+                                    }
                                 }
                             }
                         }
@@ -246,16 +260,18 @@ fn main() -> Result<(), io::Error> {
             }
         }
 
-        if rx_low_hits == 1 && rx_hit_presses == 0 {
-            rx_hit_presses = i;
-        } else {
-            // println!("rx low {} high {}", rx_low_hits, rx_high_hits);
+        i += 1;
+
+        if stop {
+            break;
         }
     }
 
-    // println!("{} high {} low", high_pulses, low_pulses);
     println!("Part 1 result: {}", high_pulses * low_pulses);
-    println!("Part 2 result: {}", rx_hit_presses);
+    println!(
+        "Part 2 result: {} {} {} {} - now find the least common multiple",
+        tx_high, ph_high, dd_high, nz_high
+    );
 
     Ok(())
 }
