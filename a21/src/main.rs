@@ -71,8 +71,18 @@ fn get_edges(grid: &Vec<char>, width: usize, center: usize, depth: usize) -> Vec
     if depth == 0 {
         get_neighbors(&grid, width, center, None)
     } else {
-        let mut up = get_neighbors(&grid, width, center - depth * width, Some(center - depth * width + width));
-        let mut down = get_neighbors(&grid, width, center + depth * width, Some(center + depth * width - width));
+        let mut up = get_neighbors(
+            &grid,
+            width,
+            center - depth * width,
+            Some(center - depth * width + width),
+        );
+        let mut down = get_neighbors(
+            &grid,
+            width,
+            center + depth * width,
+            Some(center + depth * width - width),
+        );
         let mut left = get_neighbors(&grid, width, center - depth, Some(center - depth + 1));
         let mut right = get_neighbors(&grid, width, center + depth, Some(center + depth - 1));
 
@@ -112,7 +122,7 @@ fn get_neighbors(grid: &Vec<char>, width: usize, index: usize, skip: Option<usiz
         .filter(|i| {
             let skipped = match skip {
                 None => false,
-                Some(s) => { **i == s }
+                Some(s) => **i == s,
             };
 
             ['.', 'S'].contains(&grid[**i]) && !skipped
@@ -121,11 +131,7 @@ fn get_neighbors(grid: &Vec<char>, width: usize, index: usize, skip: Option<usiz
         .collect()
 }
 
-fn iddfs(grid: &Vec<char>,
-         width: usize,
-         start: usize,
-        goal: usize,
-        max_depth: usize) -> bool {
+fn iddfs(grid: &Vec<char>, width: usize, start: usize, goal: usize, max_depth: usize) -> bool {
     for d in 1..max_depth {
         if dls(&grid, width, start, goal, d) {
             return true;
@@ -135,11 +141,7 @@ fn iddfs(grid: &Vec<char>,
     false
 }
 
-fn dls(grid: &Vec<char>,
-       width: usize,
-       start: usize,
-       goal: usize,
-       limit: usize) -> bool {
+fn dls(grid: &Vec<char>, width: usize, start: usize, goal: usize, limit: usize) -> bool {
     if start == goal {
         return true;
     }
