@@ -44,6 +44,8 @@ fn main() -> Result<(), io::Error> {
 
         let current_edges = get_edges(&grid, width, start, edge_depth);
 
+        println!("ce {:?}", current_edges);
+
         for e in current_edges.iter() {
             for pe in prev_edges.iter() {
                 if iddfs(&grid, width, *e, *pe, 6 - edge_depth) {
@@ -54,10 +56,11 @@ fn main() -> Result<(), io::Error> {
             }
         }
 
-        if !at_least_one && edge_depth > 4 {
+        if !at_least_one && edge_depth >= 6 {
             break;
         }
 
+        prev_edges = current_edges;
         at_least_one = false;
         edge_depth += 1;
     }
@@ -71,24 +74,46 @@ fn get_edges(grid: &Vec<char>, width: usize, center: usize, depth: usize) -> Vec
     if depth == 0 {
         get_neighbors(&grid, width, center, None)
     } else {
-        let mut up = get_neighbors(
-            &grid,
-            width,
-            center - depth * width,
-            Some(center - depth * width + width),
-        );
-        let mut down = get_neighbors(
-            &grid,
-            width,
-            center + depth * width,
-            Some(center + depth * width - width),
-        );
-        let mut left = get_neighbors(&grid, width, center - depth, Some(center - depth + 1));
-        let mut right = get_neighbors(&grid, width, center + depth, Some(center + depth - 1));
+        let mut up = if depth * width > center {
+            vec![]
+        } else {
+            get_neighbors(
+                &grid,
+                width,
+                center - depth * width,
+                Some(center - depth * width + width),
+            )
+        };
+
+        let mut down = if center + depth * width > grid.len() {
+            vec![]
+        } else {
+            get_neighbors(
+                &grid,
+                width,
+                center + depth * width,
+                Some(center + depth * width - width),
+            )
+        };
+
+        let mut left = if (center - depth) / width != center / width {
+            vec![]
+        } else {
+            get_neighbors(&grid, width, center - depth, Some(center - depth + 1))
+        };
+
+        let mut right = if (center + depth) / width != center / width {
+            vec![]
+        } else {
+            get_neighbors(&grid, width, center + depth, Some(center + depth - 1))
+        };
 
         up.append(&mut down);
         up.append(&mut left);
         up.append(&mut right);
+
+        up.sort();
+        up.dedup();
 
         up
     }
@@ -132,7 +157,7 @@ fn get_neighbors(grid: &Vec<char>, width: usize, index: usize, skip: Option<usiz
 }
 
 fn iddfs(grid: &Vec<char>, width: usize, start: usize, goal: usize, max_depth: usize) -> bool {
-    for d in 1..max_depth {
+    for d in 1..=max_depth {
         if dls(&grid, width, start, goal, d) {
             return true;
         }
